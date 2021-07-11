@@ -14,8 +14,8 @@ import (
 
 func main() {
 	var wait time.Duration
-	flag.DurationVar(&wait, "timeout", time.Second*5, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
-	port := flag.Int("port", 8000, "port to serve API on, default 8000")
+	flag.DurationVar(&wait, "timeout", time.Second*5, "duration to wait for gracefully exit")
+	port := flag.Int("port", 8000, "port to serve API on")
 	flag.Parse()
 	addr := fmt.Sprintf("0.0.0.0:%d", *port)
 
@@ -29,31 +29,20 @@ func main() {
 		Handler:      r,
 	}
 
-	// Run our server in a goroutine so that it doesn't block.
 	go func() {
-		log.Printf("Server start on %s\n", addr)
+		log.Printf("Server start on http://%s\n", addr)
 		if err := srv.ListenAndServe(); err != nil {
 			log.Println(err)
 		}
 	}()
 
 	c := make(chan os.Signal, 1)
-	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
-	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
 	signal.Notify(c, os.Interrupt)
-
-	// Block until we receive our signal.
 	<-c
 
-	// Create a deadline to wait for.
 	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
-	// Doesn't block if no connections, but will otherwise wait
-	// until the timeout deadline.
 	srv.Shutdown(ctx)
-	// Optionally, you could run srv.Shutdown in a goroutine and block on
-	// <-ctx.Done() if your application should wait for other services
-	// to finalize based on context cancellation.
-	log.Println("shutting down")
+	log.Println("Shutting down")
 	os.Exit(0)
 }
